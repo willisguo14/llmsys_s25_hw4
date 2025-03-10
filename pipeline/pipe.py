@@ -51,6 +51,8 @@ class Pipe(nn.Module):
         2. Generate the clock schedule.
         3. Call self.compute to compute the micro-batches in parallel.
         4. Concatenate the micro-batches to form the mini-batch and return it.
+        
+        Please note that you should put the result on the last device. Putting the result on the same device as input x will lead to fail pipeline parallel training failing.
         '''
         # BEGIN SOLUTION
         raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
