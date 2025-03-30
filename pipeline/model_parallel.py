@@ -41,8 +41,17 @@ class GPT2ModelParallel(GPT2ModelCustom):
         '''
 
         # BEGIN SOLUTION
-        pipe = None
-        raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
+        self.pipeline_parallel = True
+
+        layers = []
+
+        for block in self.h:
+            layer = nn.Sequential(block, ExtractFirstItem())
+            layers.append(layer)
+        
+        layers = nn.Sequential(*layers)
+
+        pipe = Pipe(layers, split_size=split_size)
         # END SOLUTION
         self.h_pp = pipe
 

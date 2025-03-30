@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any, Iterable, Iterator, List, Optional, Union, Sequence, Tuple, cast
 
 import torch
@@ -27,7 +28,19 @@ def _clock_cycles(num_batches: int, num_partitions: int) -> Iterable[List[Tuple[
     This function should yield schedules for each clock cycle.
     '''
     # BEGIN SOLUTION
-    raise NotImplementedError("Schedule Generation Not Implemented Yet")
+    num_cycles = num_batches + num_partitions - 1
+
+    for t in range(num_cycles):
+        schedule = []
+
+        for i in range(num_partitions):
+            micro_batch_idx = t - i
+
+            if 0 <= micro_batch_idx < num_batches:
+                schedule.append((micro_batch_idx, i))
+        
+        yield schedule
+
     # END SOLUTION
 
 class Pipe(nn.Module):
@@ -55,7 +68,14 @@ class Pipe(nn.Module):
         Please note that you should put the result on the last device. Putting the result on the same device as input x will lead to pipeline parallel training failing.
         '''
         # BEGIN SOLUTION
-        raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
+        micro_batches = list(x.split(self.split_size, dim=0))
+
+        schedule = _clock_cycles(len(micro_batches), len(self.partitions))
+
+        for sched in schedule:
+            self.compute(micro_batches, sched)
+        
+        return torch.cat([b.to(self.devices[-1]) for b in micro_batches], dim=0)
         # END SOLUTION
 
     # ASSIGNMENT 4.2
@@ -72,6 +92,25 @@ class Pipe(nn.Module):
         devices = self.devices
 
         # BEGIN SOLUTION
-        raise NotImplementedError("Pipeline Parallel Not Implemented Yet")
+        for micro_batch_id, partition_id in schedule:
+            device = devices[partition_id]
+
+            micro_batch = batches[micro_batch_id].to(device)
+            partition = partitions[partition_id]
+
+            compute = partial(partition, micro_batch)
+            task = Task(compute)
+
+            self.in_queues[partition_id].put(task) 
+        
+        for micro_batch_id, partition_id in schedule:
+            success, result = self.out_queues[partition_id].get() # each partition_id only has 1 task
+
+            if not success:
+                _, e, traceback = result
+                raise e.with_traceback(traceback) 
+            
+            _, output = result
+            batches[micro_batch_id] = output
         # END SOLUTION
 
